@@ -27,7 +27,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'portfolio_db')]
 
 # Create the main app
-app = FastAPI()
+app = FastAPI(title="Cybersecurity Portfolio API", version="1.0.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -47,6 +47,21 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Add root endpoint for health check (Railway needs this)
+@app.get("/")
+async def root():
+    return {"message": "Cybersecurity Portfolio API is running", "status": "healthy", "version": "1.0.0"}
+
+# Add health check endpoint
+@app.get("/health")
+async def health_check():
+    try:
+        # Test database connection
+        await db.admin.command('ping')
+        return {"status": "healthy", "database": "connected", "message": "All systems operational"}
+    except Exception as e:
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 # Utility function to convert ObjectId to string in responses
 def parse_json(data):
