@@ -56,27 +56,44 @@ async def root():
 # Add health check endpoint
 @app.get("/health")
 async def health_check():
-    try:
-        # Test database connection with correct Motor syntax
-        result = await db.command('ping')
-        return {"status": "healthy", "database": "connected", "message": "All systems operational", "db_ping": result}
-    except Exception as e:
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+    return {"status": "API is running", "message": "Health check endpoint working"}
 
 # Add database test endpoint
 @app.get("/test-db")
 async def test_database():
     try:
-        # Test database operations
+        # Check if environment variables are loaded
+        mongo_url = os.environ.get('MONGO_URL', 'NOT_SET')
+        db_name = os.environ.get('DB_NAME', 'NOT_SET')
+        
+        # Don't expose full connection string for security
+        mongo_info = "SET" if mongo_url != 'NOT_SET' and mongo_url.startswith('mongodb') else "NOT_SET"
+        
+        return {
+            "status": "environment_check",
+            "mongo_url": mongo_info,
+            "db_name": db_name,
+            "environment_vars": list(os.environ.keys())[:10]  # First 10 env vars for debugging
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# Add simple database connection test
+@app.get("/test-db-connection")
+async def test_db_connection():
+    try:
+        # Test basic database connection
+        result = await db.command('ping')
         collections = await db.list_collection_names()
         return {
             "status": "success", 
             "database": "connected",
+            "ping_result": result,
             "collections": collections,
             "db_name": db.name
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "database_error", "error": str(e), "error_type": type(e).__name__}
 
 # Utility function to convert ObjectId to string in responses
 def parse_json(data):
@@ -93,6 +110,11 @@ async def get_portfolio_by_user_id(user_id: str):
 @api_router.get("/")
 async def root():
     return {"message": "Portfolio API is running"}
+
+# Simple API test endpoint (no database required)
+@api_router.get("/test")
+async def api_test():
+    return {"message": "API router is working", "status": "success", "endpoint": "/api/test"}
 
 # PORTFOLIO ENDPOINTS
 @api_router.get("/portfolio/{user_id}")
