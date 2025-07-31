@@ -21,9 +21,19 @@ from models.certification import Certification, CertificationCreate, Certificati
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+# MongoDB connection with SSL fix for Railway deployment
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+
+# Configure MongoDB client with SSL settings for Railway compatibility
+client = AsyncIOMotorClient(
+    mongo_url,
+    tlsAllowInvalidCertificates=True,  # Fix for Railway SSL issues
+    serverSelectionTimeoutMS=5000,    # Shorter timeout
+    connectTimeoutMS=5000,            # Connection timeout
+    socketTimeoutMS=5000,             # Socket timeout
+    maxPoolSize=10,                   # Connection pool size
+    retryWrites=True                  # Enable retry writes
+)
 db = client[os.environ.get('DB_NAME', 'portfolio_db')]
 
 # Create the main app
@@ -37,6 +47,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Test database connection on startup
+@app.on_event("startup")
+async def startup_event():
+    try:
+        # Test database connection
+        await client.admin.command('ping')
+        logger.info("✅ Successfully connected to MongoDB!")
+    except Exception as e:
+        logger.error(f"❌ Failed to connect to MongoDB: {str(e)}")
+        logger.error("App will continue but database operations will fail")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
