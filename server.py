@@ -57,11 +57,26 @@ async def root():
 @app.get("/health")
 async def health_check():
     try:
-        # Test database connection
-        await db.admin.command('ping')
-        return {"status": "healthy", "database": "connected", "message": "All systems operational"}
+        # Test database connection with correct Motor syntax
+        result = await db.command('ping')
+        return {"status": "healthy", "database": "connected", "message": "All systems operational", "db_ping": result}
     except Exception as e:
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
+# Add database test endpoint
+@app.get("/test-db")
+async def test_database():
+    try:
+        # Test database operations
+        collections = await db.list_collection_names()
+        return {
+            "status": "success", 
+            "database": "connected",
+            "collections": collections,
+            "db_name": db.name
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # Utility function to convert ObjectId to string in responses
 def parse_json(data):
@@ -427,6 +442,15 @@ async def create_certification(user_id: str, certification_data: CertificationCr
 @api_router.post("/seed-data")
 async def seed_data():
     """Seed database with initial data from mock.js"""
+    return await _seed_data_logic()
+
+@api_router.get("/seed-data")
+async def seed_data_get():
+    """Seed database with initial data from mock.js (GET version for browser testing)"""
+    return await _seed_data_logic()
+
+async def _seed_data_logic():
+    """Common logic for seeding data"""
     try:
         # Check if data already exists
         existing_portfolio = await db.portfolios.find_one({"userId": "akshaj"})
